@@ -27,9 +27,10 @@
   ],
   "scripts": {
     "format": "prettier --write .",
-    "format-check": "prettier --check *.ts",
+    "format-check": "prettier --check *.ts test/*.mjs",
     "lint": "eslint .",
     "sort-package-json": "npx sort-package-json",
+    "test": "node --test test/*.test.mjs",
     "type-check": "tsc --noEmit"
   },
   "prettier": {

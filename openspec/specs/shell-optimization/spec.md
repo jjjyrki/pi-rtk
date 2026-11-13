@@ -10,7 +10,9 @@ applied.
 
 ### Requirement: Pre-Execution Optimization Attempt
 
-The system MUST attempt to optimize shell commands before execution.
+The system MUST attempt to optimize eligible shell commands before execution.
+Recognized output-sensitive forms and unsupported native syntax MUST retain the
+original execution path.
 
 #### Scenario: Optimization succeeds
 
@@ -38,6 +40,37 @@ The system MUST perform shell optimization using the `rtk` rewrite mechanism.
 - THEN the system MUST delegate rewrite generation to `rtk`
 - AND the command executed by the `bash` tool MUST be the rewrite output when
   that rewrite succeeds
+
+### Requirement: Preserve Recognized Output Contracts
+
+Commands containing recognized output-sensitive forms MUST execute unchanged in
+both the agent and context-visible user paths. These forms include `--files`,
+`--files-with-matches`, `--files-without-match`, `--json`, `--porcelain`,
+`--format`, `--output-format`, `--package`, supported machine-format `-f`
+values, end-of-options separators (`--`), pipes/redirections, and unresolved
+shell expansions. Conservative matching MAY decline compression for quoted text;
+it MUST NOT deny the original command or change Pi's permission checks.
+
+#### Scenario: Machine-readable output or a downstream consumer
+
+- GIVEN `rg --files`, `eslint --format json`, or `git status | another-command`
+- WHEN the command is submitted through either execution path
+- THEN the original command MUST execute unchanged without an RTK rewrite
+- AND structured output and the producer-consumer contract MUST be preserved
+
+#### Scenario: End-of-options separator
+
+- GIVEN `git diff -- marker.txt`
+- WHEN the command is submitted through either execution path
+- THEN native Git MUST receive `--` as its revision/path separator
+- AND the command MUST NOT be delegated to RTK's argument parser
+
+#### Scenario: Native find syntax
+
+- GIVEN a proposed rewrite to `rtk find`
+- WHEN the extension selects the execution path
+- THEN it MUST decline that rewrite and use native `find`
+- AND it MUST NOT retry the original after executing a side-effecting rewrite
 
 ### Requirement: Bounded Optimization Latency
 

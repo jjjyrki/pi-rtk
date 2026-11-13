@@ -103,7 +103,26 @@ function renderStatusText(ctx: ExtensionContext): string {
     : ctx.ui.theme.fg("error", "rtk ✗");
 }
 
+function requiresNativeShell(command: string): boolean {
+  // This only declines optimization; it does not parse, execute, or deny shell
+  // syntax. Conservative matches keep quoted flags and downstream consumers raw.
+  const normalized = command.replaceAll(/["'\\]/gu, "");
+
+  return (
+    /[|<>$`]/u.test(command) ||
+    /(?:^|[\s;&(])--(?:[\s;&)]|$)/u.test(normalized) ||
+    /(?:^|[\s;&(])--(?:files(?:-with(?:out)?-match(?:es)?)?|json|porcelain|format|output-format|package)(?:[=\s;&)]|$)/u.test(
+      normalized,
+    ) ||
+    /(?:^|[\s;&(])-f(?:\s*|=)(?:json(?:-with-metadata)?|xml|checkstyle|junit|unix|compact)(?:[\s;&)]|$)/u.test(
+      normalized,
+    )
+  );
+}
+
 function rtkRewriteCommand(command: string): string | undefined {
+  if (requiresNativeShell(command)) return undefined;
+
   // rtk's exit codes are permission verdicts (0/1/2/3 = allow/no-equiv/deny/
   // ask). We trust stdout and ignore the exit code. The deny verdict is
   // intentionally not enforced — this shim rewrites, it does not gate. Spawn
@@ -125,6 +144,10 @@ function rtkRewriteCommand(command: string): string | undefined {
     rtkUnavailableNotified = false;
 
     const out = (result.stdout ?? "").trimEnd();
+
+    // RTK supports only a subset of native find expressions. Keep that command
+    // native rather than emulate its grammar or retry after partial execution.
+    if (out.includes("rtk find")) return undefined;
 
     return out.length > 0 ? out : undefined; // empty stdout = exit 1 or 2
   } catch {

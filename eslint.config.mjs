@@ -105,7 +105,7 @@ export default defineConfig(
     },
   },
   {
-    files: ["eslint.config.mjs"],
+    files: ["eslint.config.mjs", "test/**/*.mjs"],
     languageOptions: {
       parserOptions: {
         program: null,

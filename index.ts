@@ -109,6 +109,9 @@ function requiresNativeShell(command: string): boolean {
   const normalized = command.replaceAll(/["'\\]/gu, "");
 
   return (
+    // RTK grep changes ripgrep's options and output; shell combinations and
+    // quoting make a partial flag allowlist unsafe. False positives only skip optimization.
+    /(?:^|[^\w])rg(?:$|[^\w])/u.test(normalized) ||
     /[|<>$`]/u.test(command) ||
     /(?:^|[\s;&(])--(?:[\s;&)]|$)/u.test(normalized) ||
     /(?:^|[\s;&(])--(?:files(?:-with(?:out)?-match(?:es)?)?|json|porcelain|format|output-format|package)(?:[=\s;&)]|$)/u.test(

@@ -3,7 +3,8 @@
  * Owns temporary CLI fixtures, not RTK's command parsing or Pi permissions.
  */
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
@@ -120,6 +121,71 @@ test("file enumeration stays native in both execution paths", async (context) =>
   assert.equal(await current.run("rg --files"), "marker.txt\n");
   assert.equal(current.user("rg --files"), undefined);
   assert.equal(current.user("rg '--files'"), undefined);
+});
+
+test("ripgrep options bypass rewriting in both hooks", async (context) => {
+  const current = await fixture(context, "rtk grep incompatible");
+
+  for (const command of [
+    "rg --files -g '*.ts'",
+    "rg --hidden literal .",
+    "rg --glob='*.ts' literal .",
+    "rg -g'*.ts' literal .",
+    "rg --type=ts literal .",
+    "rg -t ts literal .",
+    "rg -tts literal .",
+    "rg -F 'a.b' .",
+    "rg '-F' 'a.b' .",
+    "printf 'before\\n'; rg --hidden -g '*.ts' literal .",
+    "'rg' literal source.ts",
+  ]) {
+    assert.match(await current.run(command), /marker\.txt/u, command);
+    assert.equal(current.user(command), undefined, command);
+  }
+});
+
+test("ripgrep commands retain native results when ripgrep is available", async (context) => {
+  const rg = spawnSync("which", ["rg"], { encoding: "utf8" });
+
+  if (rg.status !== 0) {
+    context.skip("ripgrep is not installed");
+
+    return;
+  }
+
+  const current = await fixture(context, "rtk grep incompatible");
+
+  await rm(join(current.root, "rg"));
+  await symlink(rg.stdout.trim(), join(current.root, "rg"));
+  await writeFile(join(current.root, "source.ts"), "literal a.b\n");
+  await writeFile(join(current.root, ".hidden.ts"), "literal axb\n");
+
+  for (const command of [
+    "rg --files -g '*.ts'",
+    "rg --hidden literal .",
+    "rg --glob='*.ts' literal .",
+    "rg -g'*.ts' literal .",
+    "rg --type=ts literal .",
+    "rg -tts literal .",
+    "rg -F 'a.b' .",
+    "rg '-F' 'a.b' .",
+    "printf 'before\\n'; rg --hidden -g '*.ts' literal .",
+    "rg literal source.ts",
+  ]) {
+    const native = spawnSync("bash", ["-c", command], {
+      cwd: current.root,
+      encoding: "utf8",
+      timeout: 5000,
+    });
+
+    assert.equal(native.status, 0, `${command}: ${native.stderr}`);
+    assert.deepEqual(
+      (await current.run(command)).trimEnd().split("\n").sort(),
+      native.stdout.trimEnd().split("\n").sort(),
+      command,
+    );
+    assert.equal(current.user(command), undefined, command);
+  }
 });
 
 test("native find expressions are not sent to RTK's subset", async (context) => {

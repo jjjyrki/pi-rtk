@@ -20,12 +20,15 @@ upstream npm package linked above.
 Known output-sensitive forms keep their original execution path:
 file-enumeration and machine-format flags, pipelines/redirections, unresolved
 shell expansions, end-of-options separators (`--`), and package-selection flags.
-Quoted flags are handled conservatively. Rewrites to `rtk find` are declined
+Quoted flags are handled conservatively. Commands containing `rg` are passed
+through, including ordinary searches, because RTK's grep changes ripgrep options
+and output. Rewrites to `rtk find` are declined
 because its expression subset is narrower than native `find`. Those commands
 lose compression rather than their output contract; no potentially
 side-effecting rewrite is executed and retried. The same selection applies to
 context-visible user commands and preserves Pi's permission hooks.
 
 Run `npm test` (also included in `mise run check`) for regression tests using
-Pi's real bash tool and temporary CLI fixtures. No live model or installed RTK
-binary is required.
+Pi's real bash tool and temporary CLI fixtures. If ripgrep is available, an
+additional test compares results with the real binary. No live model or
+installed RTK binary is required.
